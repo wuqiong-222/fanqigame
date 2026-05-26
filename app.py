@@ -12,14 +12,18 @@ CHESS_WEIGHT = {
     "兵": 3, "卒": 3
 }
 
-# 所有棋子（32个）
-ALL_CHESS = [
-    "将","士","象","马","车","炮","兵",
-    "帅","仕","相","马","车","炮","卒"
-] * 2
+# 所有棋子（32个）- 修复：正确生成32个棋子
+RED_CHESS = ["将", "士", "象", "马", "车", "炮", "兵"]  # 7个
+BLACK_CHESS = ["帅", "仕", "相", "马", "车", "炮", "卒"]  # 7个
+# 每种棋子需要2个，除了兵/卒是5个
+ALL_CHESS = (
+    ["将"] * 1 + ["士"] * 2 + ["象"] * 2 + ["马"] * 2 + ["车"] * 2 + ["炮"] * 2 + ["兵"] * 5 +
+    ["帅"] * 1 + ["仕"] * 2 + ["相"] * 2 + ["马"] * 2 + ["车"] * 2 + ["炮"] * 2 + ["卒"] * 5
+)
+# 验证长度：1+2+2+2+2+2+5 + 1+2+2+2+2+2+5 = 16+16 = 32
 
 # 特殊吃子规则（小吃大）
-SPECIAL_EAT = {"兵":["将","帅"], "卒":["将","帅"]}
+SPECIAL_EAT = {"兵": ["将", "帅"], "卒": ["将", "帅"]}
 
 ROWS = 4
 COLS = 8
@@ -121,16 +125,6 @@ st.markdown("""
     background: #5e8048 !important;
 }
 
-/* 提示文字 */
-.info-text {
-    text-align: center;
-    font-size: 18px;
-    font-weight: bold;
-    padding: 10px;
-    border-radius: 20px;
-    margin: 10px 0;
-}
-
 /* 移动端适配 */
 @media (max-width: 600px) {
     .cell {
@@ -228,21 +222,19 @@ def handle_click(r, c):
     
     # 情况1：没有选中任何棋子
     if selected is None:
-        # 1.1 点击暗棋 → 翻开（确定颜色/阵营）
+        # 1.1 点击暗棋 → 翻开
         if cell["status"] == "dark":
-            # 如果当前还没有阵营（游戏刚开始）
+            # 判断棋子属于红方还是蓝方
+            is_red = cell["chess"] in ["将","士","象","马","车","炮","兵"]
+            owner = "red" if is_red else "blue"
+            
+            # 如果当前还没有阵营（游戏刚开始，先手翻第一个棋子）
             if current is None:
-                # 翻开第一个棋子，决定玩家颜色
-                owner = "red"
+                # 先手翻出的颜色就是先手玩家的颜色
                 if st.session_state.game_mode == "two_people":
-                    st.session_state.current_turn = "blue"  # 红方翻完，轮到蓝方
+                    st.session_state.current_turn = "blue" if owner == "red" else "red"
                 else:
-                    st.session_state.current_turn = "ai"    # 人机模式，轮到AI（蓝方）
-            else:
-                # 已经有阵营了，翻开的棋子归当前玩家所有？
-                # 规则：翻开的棋子颜色固定，但归当前回合玩家控制吗？
-                # 根据传统翻棋，翻出来的棋子颜色固定红或蓝，自动归对应玩家控制
-                owner = "red" if cell["chess"] in ["将","士","象","马","车","炮","兵"] else "blue"
+                    st.session_state.current_turn = "ai" if owner == "red" else "red"
             
             cell["status"] = "open"
             cell["owner"] = owner
@@ -256,7 +248,7 @@ def handle_click(r, c):
             st.session_state.selected_pos = (r, c)
             return
         
-        # 点击其他无效（空格、对方棋子）
+        # 点击其他无效
         return
     
     # 情况2：已经选中了一个棋子，尝试移动/翻吃
@@ -273,7 +265,8 @@ def handle_click(r, c):
     # 2.1 目标是暗棋 → 主动翻吃（核心规则）
     if target["status"] == "dark":
         # 翻开目标
-        target_owner = "red" if target["chess"] in ["将","士","象","马","车","炮","兵"] else "blue"
+        is_red_target = target["chess"] in ["将","士","象","马","车","炮","兵"]
+        target_owner = "red" if is_red_target else "blue"
         target["status"] = "open"
         target["owner"] = target_owner
         
@@ -286,15 +279,15 @@ def handle_click(r, c):
         
         # 特殊规则：兵/卒可吃将/帅
         if atk_chess in SPECIAL_EAT and def_chess in SPECIAL_EAT[atk_chess]:
-            # 进攻方吃防守方，防守方消失，进攻方移动到目标位置
+            # 进攻方吃防守方
             board[r][c] = source.copy()
             board[sr][sc] = {"status": "empty", "chess": None, "owner": None}
         else:
-            atk_w = CHESS_WEIGHT[atk_chess]
-            def_w = CHESS_WEIGHT[def_chess]
+            atk_w = CHESS_WEIGHT.get(atk_chess, 0)
+            def_w = CHESS_WEIGHT.get(def_chess, 0)
             
             if atk_w > def_w:
-                # 进攻方吃防守方，移动到目标位置
+                # 进攻方吃防守方
                 board[r][c] = source.copy()
                 board[sr][sc] = {"status": "empty", "chess": None, "owner": None}
             elif atk_w == def_w:
@@ -302,9 +295,8 @@ def handle_click(r, c):
                 board[sr][sc] = {"status": "empty", "chess": None, "owner": None}
                 board[r][c] = {"status": "empty", "chess": None, "owner": None}
             else:
-                # 进攻方被反吃，防守方占据进攻方位置，进攻方消失
+                # 进攻方被反吃
                 board[sr][sc] = {"status": "empty", "chess": None, "owner": None}
-                # 防守方已经在原位（翻开时已设置），不需要额外移动
         
         st.session_state.selected_pos = None
         return
@@ -316,21 +308,18 @@ def handle_click(r, c):
         st.session_state.selected_pos = None
         return
     
-    # 2.3 目标是对方棋子（明棋）→ 不允许直接吃（按规则只能翻吃暗棋）
-    # 清空选中
+    # 2.3 目标是对方棋子（明棋）→ 不允许直接吃
     st.session_state.selected_pos = None
     return
 
 def switch_turn():
     """切换回合"""
     if st.session_state.game_mode == "two_people":
-        # 双人对战：红蓝交替
         if st.session_state.current_turn == "red":
             st.session_state.current_turn = "blue"
         else:
             st.session_state.current_turn = "red"
     else:
-        # 人机模式：玩家(red) 和 AI(blue) 交替
         if st.session_state.current_turn == "red":
             st.session_state.current_turn = "ai"
         else:
@@ -342,7 +331,7 @@ def switch_turn():
 
 # ===================== AI逻辑 =====================
 def ai_move():
-    """AI走棋（简单优先级：翻暗棋 > 吃子 > 移动）"""
+    """AI走棋"""
     if st.session_state.game_over:
         return
     if st.session_state.current_turn != "ai":
@@ -398,7 +387,7 @@ if "board" not in st.session_state:
 # ===================== UI界面 =====================
 st.title("🐘 4×8 象棋翻棋")
 
-# 模式选择（仅在未开始时显示）
+# 模式选择
 if st.session_state.game_mode is None:
     col1, col2 = st.columns(2)
     with col1:
@@ -406,12 +395,13 @@ if st.session_state.game_mode is None:
             reset_game()
             st.session_state.game_mode = "two_people"
             st.session_state.current_turn = "red"
+            st.rerun()
     with col2:
         if st.button("🤖 人机对战", use_container_width=True):
             reset_game()
             st.session_state.game_mode = "ai_mode"
             st.session_state.current_turn = "red"
-    st.rerun()
+            st.rerun()
 else:
     # 重置按钮
     if st.button("🔄 重新开局", use_container_width=True):
@@ -428,58 +418,64 @@ else:
         elif turn == "ai":
             st.warning("🤖 AI思考中...")
     
-    # 绘制棋盘
+    # 绘制棋盘 - 使用Streamlit原生按钮方式
     board = st.session_state.board
     
-    # 用HTML渲染棋盘
-    board_html = '<div class="chess-board">'
+    # 创建网格布局
+    cols = st.columns(COLS)
+    
     for r in range(ROWS):
+        # 每行开始前先创建行容器
+        row_cols = st.columns(COLS)
         for c in range(COLS):
             cell = board[r][c]
-            css_class = "cell"
-            text = ""
             
+            # 确定按钮显示内容和样式
             if cell["status"] == "dark":
-                css_class += " dark"
-                text = "?"  # 背面显示？或●
+                button_text = "?"
+                button_type = "secondary"
+                disabled = False
             elif cell["status"] == "empty":
-                css_class += " empty"
-                text = ""
+                button_text = "·"
+                button_type = "secondary"
+                disabled = True
             else:
-                css_class += " red" if cell["owner"] == "red" else " blue"
-                text = cell["chess"]
+                button_text = cell["chess"]
+                if cell["owner"] == "red":
+                    button_type = "primary"
+                else:
+                    button_type = "secondary"
+                disabled = False
             
-            if st.session_state.selected_pos == (r, c):
-                css_class += " selected"
+            # 检查是否被选中
+            is_selected = (st.session_state.selected_pos == (r, c))
             
-            board_html += f'<button class="{css_class}" onclick="parent.postMessage({{type: "chess_click", row: {r}, col: {c}}}, "*")">{text}</button>'
-    board_html += '</div>'
-    
-    st.components.v1.html(board_html, height=450, scrolling=False)
-    
-    # 处理点击的JavaScript回调
-    click_data = st.session_state.get("click_data", None)
-    if click_data:
-        r, c = click_data
-        handle_click(r, c)
-        # 检查胜负
-        winner = check_win(board)
-        if winner:
-            st.session_state.game_over = True
-            st.session_state.winner = "红方胜利！" if winner == "red" else "蓝方胜利！"
-        elif check_draw(st.session_state.no_op_counter):
-            st.session_state.game_over = True
-            st.session_state.winner = "平局！"
-        else:
-            switch_turn()
-        st.session_state.click_data = None
-        st.rerun()
+            # 创建按钮
+            if row_cols[c].button(
+                button_text,
+                key=f"cell_{r}_{c}",
+                use_container_width=True,
+                type=button_type if not is_selected else "primary",
+                disabled=disabled
+            ):
+                if not st.session_state.game_over:
+                    handle_click(r, c)
+                    # 检查胜负
+                    winner = check_win(board)
+                    if winner:
+                        st.session_state.game_over = True
+                        st.session_state.winner = "红方胜利！" if winner == "red" else "蓝方胜利！"
+                    elif check_draw(st.session_state.no_op_counter):
+                        st.session_state.game_over = True
+                        st.session_state.winner = "平局！"
+                    else:
+                        switch_turn()
+                    st.rerun()
     
     # 人机模式AI自动走棋
     if st.session_state.game_mode == "ai_mode" and not st.session_state.game_over and st.session_state.current_turn == "ai":
         ai_move()
-        # 再次检查胜负
-        winner = check_win(board)
+        winner = check_win(st.session_state.board)
         if winner:
             st.session_state.game_over = True
             st.session_state.winner = "红方胜利！" if winner == "red" else "蓝方胜利！"
