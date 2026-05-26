@@ -1,7 +1,3 @@
-"""
-4×8 象棋翻棋 — Streamlit 双人对战 / 人机对战
-"""
-
 import base64
 import random
 
@@ -23,7 +19,6 @@ STALE_LIMIT = 10
 
 
 def build_piece_pool():
-    """32 枚棋子随机洗牌后填入棋盘。"""
     red = ["将"] + ["士"] * 2 + ["象"] * 2 + ["马"] * 2 + ["车"] * 2 + ["炮"] * 2 + ["兵"] * 5
     black = ["帅"] + ["仕"] * 2 + ["相"] * 2 + ["马"] * 2 + ["车"] * 2 + ["炮"] * 2 + ["卒"] * 5
     pool = [(n, "red") for n in red] + [(n, "black") for n in black]
@@ -128,7 +123,6 @@ def cell_at(r, c):
 
 
 def can_jump_attack(r1, c1, r2, c2):
-    """同行或同列即可跳吃，不必相邻，中间可有其他棋子。"""
     if (r1, c1) == (r2, c2):
         return False
     return r1 == r2 or c1 == c2
@@ -192,7 +186,6 @@ def check_end_after_action():
 
 
 def finish_action(flipped_new=False, captured=False):
-    """完成一次合法行动后换手（选棋不算行动）。"""
     if captured or flipped_new:
         st.session_state.stale_turns = 0
     else:
@@ -306,7 +299,6 @@ def do_open_eat_dark(fr, fc, tr, tc):
 
 
 def do_open_eat_open(fr, fc, tr, tc):
-    """明吃明：同行/同列跳吃。"""
     board = st.session_state.board
     src, tgt = board[fr][fc], board[tr][tc]
     player = camp_of_turn()
@@ -333,16 +325,13 @@ def handle_cell_click(r, c):
     player = camp_of_turn()
     sel = st.session_state.selected
 
-    # 玩家一首翻定阵营
     if player is None:
         if cell["status"] == "dark":
             do_simple_flip(r, c)
         return
 
-    # ── 无选中 ──
     if sel is None:
         if cell["status"] == "dark":
-            # 直接翻棋，一次点击，留在原地，结束回合
             do_simple_flip(r, c)
         elif cell["status"] == "open" and cell["camp"] == player:
             st.session_state.selected = (r, c)
@@ -360,7 +349,6 @@ def handle_cell_click(r, c):
 
     src = cell_at(sr, sc)
 
-    # 已选己方明棋 → 明吃暗 / 明吃明（可跳吃）
     if src["status"] == "open" and src["camp"] == player:
         if do_open_eat_dark(sr, sc, r, c):
             return
@@ -373,7 +361,6 @@ def handle_cell_click(r, c):
         st.session_state.message = "请点同行/同列的暗棋或敌明棋（跳吃）。"
         return
 
-    # 已选对方明棋 → 暗吃明（跳吃）
     if src["status"] == "open" and src["camp"] != player:
         if do_dark_eat_open(r, c, sr, sc):
             return
@@ -381,9 +368,6 @@ def handle_cell_click(r, c):
         return
 
 
-# ---------------------------------------------------------------------------
-# AI
-# ---------------------------------------------------------------------------
 def ai_camp():
     rh, bh = holders()
     return "black" if bh == "ai" else "red"
@@ -451,11 +435,7 @@ def run_ai():
     st.session_state.pending_ai = False
 
 
-# ---------------------------------------------------------------------------
-# UI
-# ---------------------------------------------------------------------------
 def piece_svg_img(cell, selected=False):
-    """生成 SVG 棋子 HTML（st.image 不支持 SVG，用 img 标签显示）。"""
     ring = (
         '<circle cx="50" cy="50" r="48" fill="none" stroke="#ffd700" stroke-width="5"/>'
         if selected
@@ -500,43 +480,71 @@ def inject_css():
     st.markdown(
         """
         <style>
-        .block-container { padding: 0.5rem; max-width: 100%; }
-        h1 { text-align: center; color: #4a2c0a; }
+        /* 全局：修复顶部遮挡 + 全屏不溢出 */
+        .block-container {
+            padding-top: 3rem !important;
+            padding-bottom: 2rem !important;
+            padding-left: 0.5rem !important;
+            padding-right: 0.5rem !important;
+            max-width: 100% !important;
+        }
+        /* 标题修复：不被顶部导航遮挡 */
+        h1 {
+            margin-top: 0px !important;
+            margin-bottom: 0.5rem !important;
+            font-size: clamp(1.4rem, 5vw, 2rem) !important;
+            text-align: center !important;
+            color: #4a2c0a !important;
+        }
+        /* 状态条 */
         .status-bar {
-            text-align: center; padding: 0.5rem; margin: 0.3rem auto;
-            max-width: 36rem; background: #f5e6c8; border: 2px solid #8b6914;
+            text-align: center;
+            padding: 0.4rem;
+            margin: 0.3rem auto;
+            max-width: 95vw;
+            background: #f5e6c8;
+            border: 2px solid #8b6914;
+            border-radius: 8px;
+            font-size: clamp(0.8rem, 3vw, 1rem);
+        }
+        /* 棋盘容器：强制自适应宽度，手机不会过大 */
+        .board-frame {
+            width: 96vw !important;
+            max-width: 420px !important;
+            margin: 0 auto !important;
+            padding: 6px !important;
+            background: #4a2810;
             border-radius: 8px;
         }
-        .legend {
-            display: flex; justify-content: center; gap: 2rem;
-            margin: 0.5rem 0; font-size: 0.95rem; font-weight: 600;
+        /* 棋子：强制等比例 + 最大高度限制，手机不会巨大 */
+        .piece-img {
+            width: 100% !important;
+            height: auto !important;
+            max-height: 52px !important;
+            object-fit: contain !important;
+            display: block !important;
+            aspect-ratio: 1/1 !important;
         }
-        .legend-red { color: #d50000; }
-        .legend-black { color: #000; }
-        .help-text {
-            text-align: center; font-size: 0.8rem; color: #5d4037; margin-bottom: 0.5rem;
+        /* 格子间距 */
+        div[data-testid="column"] {
+            padding: 1px !important;
+            min-width: 0 !important;
         }
-        .board-frame {
-            width: min(100%, 700px); margin: 0 auto; padding: 8px;
-            background: #4a2810; border-radius: 8px;
+        div[data-testid="stHorizontalBlock"] {
+            gap: 0px !important;
         }
-        div[data-testid="column"] { padding: 1px !important; }
-        div[data-testid="stHorizontalBlock"] { gap: 0 !important; }
         .cell-box {
             background: rgba(255,248,220,0.12);
-            border: 1px solid rgba(92,58,18,0.4);
+            border: 1px solid rgba(92,58,18,0.3);
             border-radius: 4px;
             padding: 1px;
         }
-        .piece-img {
-            width: 100%;
-            display: block;
-            aspect-ratio: 1 / 1;
-        }
+        /* 按钮缩小，不占空间 */
         .cell-box div.stButton > button {
-            padding: 0.1rem 0 !important;
-            min-height: 1.6rem !important;
-            font-size: 0.75rem !important;
+            padding: 0px !important;
+            height: 24px !important;
+            min-height: 24px !important;
+            font-size: 0px !important;
             border-radius: 4px !important;
         }
         </style>
@@ -546,20 +554,11 @@ def inject_css():
 
 
 def render_legend():
-    st.markdown(
-        """
-        <div class="legend">
-          <span class="legend-red">● 红方：红色字</span>
-          <span class="legend-black">● 黑方：黑色字</span>
+    st.markdown("""
+        <div style="text-align:center; font-size:12px; color:#5d4037; margin:4px 0;">
+        开局暗摆｜玩家一先翻定阵营｜同行/同列可跳吃
         </div>
-        <p class="help-text">
-          开局 32 枚棋子<b>随机</b>暗摆｜玩家一先翻定红/黑，轮流行动｜
-          <b>翻棋</b>：点暗棋｜
-          <b>明吃明 / 明吃暗 / 暗吃明</b>：先选再吃，同行或同列即可跳吃（不必相邻）
-        </p>
-        """,
-        unsafe_allow_html=True,
-    )
+    """, unsafe_allow_html=True)
 
 
 def render_board():
@@ -567,10 +566,7 @@ def render_board():
     frozen = bool(st.session_state.winner or st.session_state.is_draw)
     disabled = frozen or (st.session_state.game_mode == "pvai" and not is_human_turn())
 
-    st.markdown(
-        '<div style="background:linear-gradient(160deg,#dcb35c,#b8842f);padding:5px;border:2px solid #5c3a12;">',
-        unsafe_allow_html=True,
-    )
+    st.markdown('<div style="background:linear-gradient(160deg,#dcb35c,#b8842f);padding:4px;border:2px solid #5c3a12;">', unsafe_allow_html=True)
     for r in range(ROWS):
         cols = st.columns(COLS, gap="small")
         for c in range(COLS):
@@ -580,12 +576,12 @@ def render_board():
                 st.markdown('<div class="cell-box">', unsafe_allow_html=True)
                 st.markdown(piece_svg_img(cell, selected), unsafe_allow_html=True)
                 st.button(
-                    "✓ 点这里",
+                    "",
                     key=f"cell_{r}_{c}",
                     on_click=handle_cell_click,
                     args=(r, c),
                     disabled=disabled,
-                    use_container_width=True,
+                    use_container_width=True
                 )
                 st.markdown("</div>", unsafe_allow_html=True)
     st.markdown("</div>", unsafe_allow_html=True)
@@ -627,7 +623,7 @@ def page_game():
         unsafe_allow_html=True,
     )
 
-    c1, c2, _ = st.columns(3)
+    c1, c2 = st.columns(2)
     with c1:
         if st.button("返回菜单", use_container_width=True):
             reset_to_menu()
@@ -642,14 +638,13 @@ def page_game():
     render_legend()
     st.markdown('<div class="board-frame">', unsafe_allow_html=True)
     render_board()
-    st.markdown("</div>", unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
     if st.session_state.winner:
         st.success(st.session_state.message)
     elif st.session_state.is_draw:
         st.warning(st.session_state.message)
 
-    # 人机：先显示玩家行动结果，下一轮再让 AI 走（避免一次点击连走两步）
     if st.session_state.run_ai_step:
         st.session_state.run_ai_step = False
         run_ai()
@@ -660,7 +655,12 @@ def page_game():
 
 
 def main():
-    st.set_page_config(page_title="象棋翻棋 4×8", page_icon="♟️", layout="wide", initial_sidebar_state="collapsed")
+    st.set_page_config(
+        page_title="象棋翻棋",
+        page_icon="♟️",
+        layout="wide",
+        initial_sidebar_state="collapsed"
+    )
     inject_css()
     if "page" not in st.session_state:
         st.session_state.page = "menu"
