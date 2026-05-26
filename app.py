@@ -1,6 +1,5 @@
 import base64
 import random
-
 import streamlit as st
 
 ROWS, COLS = 4, 8
@@ -17,7 +16,6 @@ CHESS_WEIGHT = {
 
 STALE_LIMIT = 10
 
-
 def build_piece_pool():
     red = ["将"] + ["士"] * 2 + ["象"] * 2 + ["马"] * 2 + ["车"] * 2 + ["炮"] * 2 + ["兵"] * 5
     black = ["帅"] + ["仕"] * 2 + ["相"] * 2 + ["马"] * 2 + ["车"] * 2 + ["炮"] * 2 + ["卒"] * 5
@@ -25,14 +23,11 @@ def build_piece_pool():
     random.shuffle(pool)
     return pool
 
-
 def new_cell(chess, camp):
     return {"status": "dark", "chess": chess, "camp": camp}
 
-
 def empty_cell():
     return {"status": "empty", "chess": None, "camp": None}
-
 
 def init_session():
     pool = build_piece_pool()
@@ -60,20 +55,16 @@ def init_session():
     st.session_state.run_ai_step = False
     st.session_state.last_capture_general = None
 
-
 def reset_to_menu():
     for key in list(st.session_state.keys()):
         del st.session_state[key]
     st.session_state.page = "menu"
 
-
 def holders():
     return st.session_state.red_holder, st.session_state.black_holder
 
-
 def camp_of_turn():
     return st.session_state.turn
-
 
 def human_camp():
     rh, bh = holders()
@@ -83,13 +74,11 @@ def human_camp():
         return "black"
     return None
 
-
 def player_label(camp):
     rh, bh = holders()
     if camp == "red":
         return "玩家一" if rh == "p1" else "玩家二"
     return "玩家一" if bh == "p1" else "玩家二"
-
 
 def is_human_turn():
     mode = st.session_state.game_mode
@@ -101,7 +90,6 @@ def is_human_turn():
     rh, bh = holders()
     return (turn == "red" and rh == "human") or (turn == "black" and bh == "human")
 
-
 def assign_colors_on_first_flip(camp):
     mode = st.session_state.game_mode
     if camp == "red":
@@ -112,21 +100,17 @@ def assign_colors_on_first_flip(camp):
         st.session_state.red_holder = "ai" if mode == "pvai" else "p2"
     st.session_state.turn = camp
 
-
 def switch_turn():
     st.session_state.turn = "black" if st.session_state.turn == "red" else "red"
     st.session_state.selected = None
 
-
 def cell_at(r, c):
     return st.session_state.board[r][c]
-
 
 def can_jump_attack(r1, c1, r2, c2):
     if (r1, c1) == (r2, c2):
         return False
     return r1 == r2 or c1 == c2
-
 
 def compare_strength(attacker, defender):
     wa, wd = CHESS_WEIGHT[attacker], CHESS_WEIGHT[defender]
@@ -135,7 +119,6 @@ def compare_strength(attacker, defender):
     if wa == wd:
         return "tie"
     return "lose"
-
 
 def count_pieces(camp):
     return sum(
@@ -146,7 +129,6 @@ def count_pieces(camp):
         and st.session_state.board[r][c]["camp"] == camp
     )
 
-
 def general_alive(camp):
     target = "将" if camp == "red" else "帅"
     return any(
@@ -155,7 +137,6 @@ def general_alive(camp):
         for r in range(ROWS)
         for c in range(COLS)
     )
-
 
 def check_end_after_action():
     captured = st.session_state.get("last_capture_general")
@@ -184,7 +165,6 @@ def check_end_after_action():
         st.session_state.is_draw = True
         st.session_state.message = f"平局！连续 {STALE_LIMIT} 回合无吃子且无翻新。"
 
-
 def finish_action(flipped_new=False, captured=False):
     if captured or flipped_new:
         st.session_state.stale_turns = 0
@@ -201,7 +181,6 @@ def finish_action(flipped_new=False, captured=False):
     switch_turn()
     if st.session_state.game_mode == "pvai" and not is_human_turn():
         st.session_state.pending_ai = True
-
 
 def resolve_battle(attacker_cell, attacker_pos, defender_cell, defender_pos):
     board = st.session_state.board
@@ -234,7 +213,6 @@ def resolve_battle(attacker_cell, attacker_pos, defender_cell, defender_pos):
     st.session_state.last_capture_general = captured_general
     return captured_general is not None
 
-
 def do_simple_flip(r, c):
     cell = cell_at(r, c)
     if cell["status"] != "dark":
@@ -256,7 +234,6 @@ def do_simple_flip(r, c):
     finish_action(flipped_new=True)
     return True
 
-
 def do_dark_eat_open(dr, dc, tr, tc):
     board = st.session_state.board
     dark, tgt = board[dr][dc], board[tr][tc]
@@ -274,7 +251,6 @@ def do_dark_eat_open(dr, dc, tr, tc):
     captured = resolve_battle({**dark}, (dr, dc), tgt, (tr, tc))
     finish_action(flipped_new=True, captured=captured)
     return True
-
 
 def do_open_eat_dark(fr, fc, tr, tc):
     board = st.session_state.board
@@ -297,7 +273,6 @@ def do_open_eat_dark(fr, fc, tr, tc):
     finish_action(flipped_new=True, captured=captured)
     return True
 
-
 def do_open_eat_open(fr, fc, tr, tc):
     board = st.session_state.board
     src, tgt = board[fr][fc], board[tr][tc]
@@ -313,7 +288,6 @@ def do_open_eat_open(fr, fc, tr, tc):
     captured = resolve_battle({**src}, (fr, fc), tgt, (tr, tc))
     finish_action(captured=captured)
     return True
-
 
 def handle_cell_click(r, c):
     if st.session_state.winner or st.session_state.is_draw:
@@ -367,11 +341,9 @@ def handle_cell_click(r, c):
         st.session_state.message = "请点同行/同列的己方暗棋（跳吃）。"
         return
 
-
 def ai_camp():
     rh, bh = holders()
     return "black" if bh == "ai" else "red"
-
 
 def run_ai():
     if st.session_state.winner or st.session_state.is_draw:
@@ -434,7 +406,6 @@ def run_ai():
 
     st.session_state.pending_ai = False
 
-
 def piece_svg_img(cell, selected=False):
     ring = (
         '<circle cx="50" cy="50" r="48" fill="none" stroke="#ffd700" stroke-width="5"/>'
@@ -475,59 +446,55 @@ def piece_svg_img(cell, selected=False):
     b64 = base64.b64encode(svg.encode("utf-8")).decode("ascii")
     return f'<img class="piece-img" src="data:image/svg+xml;base64,{b64}" alt=""/>'
 
-
 def inject_css():
     st.markdown(
         """
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
         <style>
-        /* 全局：修复顶部遮挡 + 全屏不溢出 */
+        html, body {
+            overflow: hidden !important;
+            touch-action: manipulation !important;
+        }
         .block-container {
-            padding-top: 3rem !important;
-            padding-bottom: 2rem !important;
-            padding-left: 0.5rem !important;
-            padding-right: 0.5rem !important;
-            max-width: 100% !important;
+            padding-top: 1rem !important;
+            padding-bottom: 1rem !important;
+            padding-left: 0.3rem !important;
+            padding-right: 0.3rem !important;
+            max-width: 100vw !important;
+            width: 100vw !important;
         }
-        /* 标题修复：不被顶部导航遮挡 */
         h1 {
-            margin-top: 0px !important;
-            margin-bottom: 0.5rem !important;
-            font-size: clamp(1.4rem, 5vw, 2rem) !important;
+            margin: 0.2rem 0 !important;
+            font-size: clamp(1.1rem, 4vw, 1.6rem) !important;
             text-align: center !important;
-            color: #4a2c0a !important;
         }
-        /* 状态条 */
         .status-bar {
             text-align: center;
-            padding: 0.4rem;
-            margin: 0.3rem auto;
-            max-width: 95vw;
+            padding: 0.3rem;
+            margin: 0.2rem auto;
             background: #f5e6c8;
             border: 2px solid #8b6914;
             border-radius: 8px;
-            font-size: clamp(0.8rem, 3vw, 1rem);
+            font-size: clamp(0.7rem, 3vw, 0.95rem);
         }
-        /* 棋盘容器：强制自适应宽度，手机不会过大 */
+        /* 横屏自动放大棋盘 */
         .board-frame {
-            width: 96vw !important;
-            max-width: 420px !important;
+            width: 98vw !important;
+            max-width: min(90vh, 98vw) !important;
             margin: 0 auto !important;
-            padding: 6px !important;
+            padding: 4px !important;
             background: #4a2810;
             border-radius: 8px;
         }
-        /* 棋子：强制等比例 + 最大高度限制，手机不会巨大 */
         .piece-img {
             width: 100% !important;
             height: auto !important;
-            max-height: 52px !important;
             object-fit: contain !important;
             display: block !important;
             aspect-ratio: 1/1 !important;
         }
-        /* 格子间距 */
         div[data-testid="column"] {
-            padding: 1px !important;
+            padding: 0.5px !important;
             min-width: 0 !important;
         }
         div[data-testid="stHorizontalBlock"] {
@@ -539,11 +506,9 @@ def inject_css():
             border-radius: 4px;
             padding: 1px;
         }
-        /* 按钮缩小，不占空间 */
         .cell-box div.stButton > button {
             padding: 0px !important;
-            height: 24px !important;
-            min-height: 24px !important;
+            height: 20px !important;
             font-size: 0px !important;
             border-radius: 4px !important;
         }
@@ -552,21 +517,19 @@ def inject_css():
         unsafe_allow_html=True,
     )
 
-
 def render_legend():
     st.markdown("""
-        <div style="text-align:center; font-size:12px; color:#5d4037; margin:4px 0;">
-        开局暗摆｜玩家一先翻定阵营｜同行/同列可跳吃
+        <div style="text-align:center; font-size:11px; margin:2px 0;">
+        手机横屏体验更佳｜同行同列跳吃
         </div>
     """, unsafe_allow_html=True)
-
 
 def render_board():
     board = st.session_state.board
     frozen = bool(st.session_state.winner or st.session_state.is_draw)
     disabled = frozen or (st.session_state.game_mode == "pvai" and not is_human_turn())
 
-    st.markdown('<div style="background:linear-gradient(160deg,#dcb35c,#b8842f);padding:4px;border:2px solid #5c3a12;">', unsafe_allow_html=True)
+    st.markdown('<div style="background:linear-gradient(160deg,#dcb35c,#b8842f);padding:3px;border:2px solid #5c3a12;">', unsafe_allow_html=True)
     for r in range(ROWS):
         cols = st.columns(COLS, gap="small")
         for c in range(COLS):
@@ -575,17 +538,9 @@ def render_board():
             with cols[c]:
                 st.markdown('<div class="cell-box">', unsafe_allow_html=True)
                 st.markdown(piece_svg_img(cell, selected), unsafe_allow_html=True)
-                st.button(
-                    "",
-                    key=f"cell_{r}_{c}",
-                    on_click=handle_cell_click,
-                    args=(r, c),
-                    disabled=disabled,
-                    use_container_width=True
-                )
+                st.button("", key=f"cell_{r}_{c}", on_click=handle_cell_click, args=(r, c), disabled=disabled, use_container_width=True)
                 st.markdown("</div>", unsafe_allow_html=True)
     st.markdown("</div>", unsafe_allow_html=True)
-
 
 def turn_hint():
     if st.session_state.winner or st.session_state.is_draw:
@@ -601,7 +556,6 @@ def turn_hint():
         return f"你的回合（执{my}方）"
     return "AI 回合"
 
-
 def page_menu():
     st.title("象棋翻棋")
     _, mid, _ = st.columns([1, 2, 1])
@@ -615,13 +569,9 @@ def page_menu():
             init_session()
             st.rerun()
 
-
 def page_game():
     st.title("象棋翻棋")
-    st.markdown(
-        f'<div class="status-bar"><b>{turn_hint()}</b><br>{st.session_state.message}</div>',
-        unsafe_allow_html=True,
-    )
+    st.markdown(f'<div class="status-bar"><b>{turn_hint()}</b><br>{st.session_state.message}</div>', unsafe_allow_html=True)
 
     c1, c2 = st.columns(2)
     with c1:
@@ -653,7 +603,6 @@ def page_game():
         st.session_state.run_ai_step = True
         st.rerun()
 
-
 def main():
     st.set_page_config(
         page_title="象棋翻棋",
@@ -668,7 +617,6 @@ def main():
         page_menu()
     else:
         page_game()
-
 
 if __name__ == "__main__":
     main()
